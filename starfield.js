@@ -17,20 +17,23 @@ var state = {
 		ships: [],
 		junk: [],
 	},
+	mainShip: undefined,
 	frame: 0,
 }
-//var stars = []
-//var frame = 0
-//var ship
 
 // Classes (well as close as possible in ES5)
-function Entity(x, y, spriteID, spriteScale) {
-	this.x = x
-	this.y = y
-	this.spriteID = spriteID
-	this.spriteScale = spriteScale
+function Entity(config) {
+	this.className = "Entity"
+	this.x = config.x !== undefined ? config.x : 0
+	this.y = config.y !== undefined ? config.y : 0
+	this.spriteID = config.spriteID !== undefined ? config.spriteID : 255
+	this.transparentColorIndex = config.transparentColorIndex !== undefined 
+		? config.transparentColorIndex
+		: 0
+	this.spriteRotation = config.spriteRotation !== undefined ? config.spriteRotation : 0
+	this.spriteScale = config.spriteScale !== undefined ? config.spriteScale : 1
 	this.spriteSize = 8 * this.spriteScale
-	this.gcExempt = false
+	this.gcExempt = config.gcExempt !== undefined ? config.gcExempt : false
 	this.getPosition = function () {
 		return [this.x, this.y]
 	}
@@ -56,11 +59,20 @@ function Entity(x, y, spriteID, spriteScale) {
 		}*/
 		return xOnscreen && yOnscreen
 	}
+	this.draw = function () {
+		spr(
+			this.spriteID,
+			this.x,
+			this.y,
+			this.transparentColorIndex,
+			this.spriteScale
+		)
+	}
 }
-function Star(x, y, spriteID, spriteScale) {
-	var defaultSpriteScale = spriteScale ? spriteScale : 1
-	Entity.call(this, x, y, spriteID, defaultSpriteScale)
-	this.transparentColorIndex = 0
+
+function Star(entityConfig) {
+	Entity.call(this, entityConfig)
+	this.className = "Star"
 	// divides the stars into 4 planes which move at different speeds for parallax
 	this.plane = randInt(4)
 	this.speed = 0.2 * ((this.plane + 1) / 2)
@@ -79,13 +91,59 @@ function Star(x, y, spriteID, spriteScale) {
 			this.setY(this.y + this.speed)
 		}
 	}
+	this.destruct = function () {
+		var index = state.entities.stars.indexOf(this)
+		state.entities.stars.splice(index, 1)
+	}
 
 	this.randomize(this.x, this.spriteID)
 }
 
-function Ship() {
-	Entity.call(this, screenX / 2 - 16, screenY - 32, 16, 2)
+function Ship(entityConfig) {
+	Entity.call(this, entityConfig)
+	this.className = "Ship"
 	this.animationFrame = 0
+	this.destruct = function () {
+		var index = state.entities.ships.indexOf(this)
+		state.entities.ships.splice(index, 1)
+	}
+}
+
+function MainShip(entityConfig) {
+	Ship.call(this, entityConfig)
+	this.className = "MainShip"
+	this.move = function () {
+		this.y += Math.sin(state.frame / 8) / 4
+	}
+	this.draw = function () {
+		var exhaustSpriteID = 32
+		spr(this.spriteID, this.x, this.y, this.transparentColorIndex, 2)
+		if (state.frame % 6 === 5) {
+			this.animationFrame = (this.animationFrame + 1) % 3
+		}
+		// the ship exhaust animation is a different sprite
+		spr(
+			exhaustSpriteID + this.animationFrame,
+			this.x,
+			this.y + 16,
+			this.transparentColorIndex,
+			2
+		)
+	}
+}
+
+function UFO(entityConfig) {
+	Ship.call(this, entityConfig)
+	this.className = "UFO"
+	this.speed = entityConfig.speed
+	this.move = function () {
+		this.x += this.speed
+		this.y += this.speed / 6
+		if (!this.getIsOnscreen()) {
+			this.destruct()
+			//trace("UFO self destructed")
+		}
+	}
 }
 
 // Functions
@@ -118,50 +176,58 @@ function entitiesGC() {
 	}
 }
 
-function drawStars() {
-	state.entities.stars.forEach(function (star) {
-		spr(star.spriteID, star.x, star.y, star.transparentColorIndex)
-		star.move()
-	})
-}
-
-function drawShip() {
-	var exhaustSpriteID = 32
-	var ship = state.entities.ships[0]
-	spr(ship.spriteID, ship.x, ship.y, 0, ship.spriteScale)
-	if (state.frame % 6 === 5) {
-		ship.animationFrame = (ship.animationFrame + 1) % 3
+function drawAndMoveEntities() {
+	for (var property in state.entities) {
+		var entitiesArray = state.entities[property]
+		entitiesArray.forEach(function (entity) {
+			entity.draw()
+			entity.move()
+		})
 	}
-	spr(exhaustSpriteID + ship.animationFrame, ship.x, ship.y + 16, 0, 2)
 }
 
 function BOOT() {
 	for (var i = 0; i < maxStars; i++) {
-		state.entities.stars.push(new Star(randInt(screenX), randInt(screenY)))
+		state.entities.stars.push(
+			new Star({
+				x: randInt(screenX),
+				y: randInt(screenY),
+				spriteID: randInt(13),
+				transparentColorIndex: 0 
+			})
+		)
 	}
 	// sort the stars by plane so the closer and faster ones draw on top of the others
 	state.entities.stars.sort(function (a, b) {
 		return a.plane - b.plane
 	})
-	state.entities.ships.push(new Ship())
-	// garbace collection test
-	/*state.entities.junk.push(new Star(0, screenY + 10))
-	state.entities.junk.push(new Star(screenX + 10, 0))
-	state.entities.junk.push(new Star(screenX + 10, screenY + 10))
-	state.entities.junk.push(new Star(-9, -9))
-	state.entities.junk.push(new Star(0, -9))
-	state.entities.junk.push(new Star(-9, 1))
-	state.entities.junk.push(new Star(-9, 2))
-	state.entities.junk.push(new Star(-9, -1))
-	state.entities.junk.push(new Star(-9, -2))
-	state.entities.junk.push(new Star(-9, 0)) */
+	state.entities.ships.unshift(
+		new MainShip({
+			x: screenX / 2 - 16,
+			y: screenY - 32,
+			spriteID: 16,
+			spriteScale: 2,
+		})
+	)
+	state.mainShip = state.entities.ships[0]
 }
+
 function TIC() {
 	cls(0)
-	drawStars()
-	drawShip()
+	drawAndMoveEntities()
 	// have framecount loop every 10 minutes
 	state.frame = (state.frame + 1) % (60 * 60 * 10)
+	//spawn a UFO every now and then
+	if (state.frame % (60 * 20) === 0){
+		state.entities.ships.push(new UFO({
+			x: -8,
+			y: randInt(screenY/2.5),
+			speed: (Math.random() * 0.4) + 0.3,
+			spriteID: 48,
+			spriteScale: 1.5
+		}))
+		//trace("A UFO!")
+	}
 	// run GC once per minute
 	if (state.frame % (60 * 60) === 0) {
 		//trace("Starting Garbage Collection:")
@@ -188,6 +254,8 @@ function TIC() {
 // 032:b000000ba00aa00a900990090008800000000000000000000000000000000000
 // 033:80000008900aa009a0a99a0a0098890000800800000000000000000000000000
 // 034:000000009000000900a00a00809aa90800899800000880000000000000000000
+// 048:0000000000cdef0006deef600dfffed006666660677667767bb77bb709900990
+// 255:ccccccccc00ee00cc0e00e0cc0000e0cc000e00cc000000cc000e00ccccccccc
 // </TILES>
 
 // <WAVES>
@@ -207,3 +275,4 @@ function TIC() {
 // <PALETTE>
 // 000:1a1c2c5d275db13e53ef7d57ffcd75a7f07038b76425717929366f3b5dc941a6f673eff7f4f4f494b0c2566c86333c57
 // </PALETTE>
+
