@@ -3,23 +3,34 @@
 // title:   Starfield
 // author:  Escaped Moon Jelly
 // desc:    A simple scrolling starfield demo
-// site:    
-// license: MIT License 
+// site:
+// license: MIT License
 // version: 0.1
 // script:  js
 //'use strict'
-var screenX = 240
-var screenY = 136
-var maxStars = 64
-var stars = []
-var frame = 0
-var ship
+const screenX = 240
+const screenY = 136
+const maxStars = 128
+var state = {
+	entities: {
+		stars: [],
+		ships: [],
+		junk: [],
+	},
+	frame: 0,
+}
+//var stars = []
+//var frame = 0
+//var ship
 
 // Classes (well as close as possible in ES5)
-function Entity(x, y, spriteID) {
+function Entity(x, y, spriteID, spriteScale) {
 	this.x = x
 	this.y = y
 	this.spriteID = spriteID
+	this.spriteScale = spriteScale
+	this.spriteSize = 8 * this.spriteScale
+	this.gcExempt = false
 	this.getPosition = function () {
 		return [this.x, this.y]
 	}
@@ -36,9 +47,19 @@ function Entity(x, y, spriteID) {
 	this.setSprite = function (newSpriteID) {
 		this.SpriteID = newSpriteID
 	}
+	this.getIsOnscreen = function () {
+		var minXY = 0 - this.spriteSize
+		var xOnscreen = minXY <= this.x && this.x <= screenX
+		var yOnscreen = minXY <= this.y && this.y <= screenY
+		/*if (!xOnscreen || !yOnscreen) {
+			trace("entity not onscreen: " + this.x +"," + this.y)
+		}*/
+		return xOnscreen && yOnscreen
+	}
 }
-function Star(x, y, spriteID) {
-	Entity.call(this, x, y, spriteID)
+function Star(x, y, spriteID, spriteScale) {
+	var defaultSpriteScale = spriteScale ? spriteScale : 1
+	Entity.call(this, x, y, spriteID, defaultSpriteScale)
 	this.transparentColorIndex = 0
 	// divides the stars into 4 planes which move at different speeds for parallax
 	this.plane = randInt(4)
@@ -49,10 +70,9 @@ function Star(x, y, spriteID) {
 		this.spriteID = spriteID !== undefined ? spriteID : randInt(13)
 	}
 	this.move = function () {
-		var maxY = screenY + 8 // sprites are 8px tall
-		var minY = -8
+		var minY = 0 - this.spriteSize
 		// if the next frame would be offscreen wrap around to the top as a new star
-		if (this.y >= maxY - this.speed) {
+		if (this.y + this.speed >= screenY) {
 			this.setY(minY)
 			this.randomize()
 		} else {
@@ -60,11 +80,11 @@ function Star(x, y, spriteID) {
 		}
 	}
 
-	this.randomize()
+	this.randomize(this.x, this.spriteID)
 }
 
-function Ship () {
-	Entity.call(this, screenX/2 - 16, screenY - 32, 16)
+function Ship() {
+	Entity.call(this, screenX / 2 - 16, screenY - 32, 16, 2)
 	this.animationFrame = 0
 }
 
@@ -72,9 +92,34 @@ function Ship () {
 function randInt(max) {
 	return Math.round(Math.random() * max)
 }
+function entitiesGC() {
+	//totally pointless garbage collection for practice
+	for (var property in state.entities) {
+		var entitiesArray = state.entities[property]
+		var toDelete = []
+		entitiesArray.forEach(function (entity) {
+			if (!entity.gcExempt && !entity.getIsOnscreen()) {
+				toDelete.push(entity)
+				trace("Entity in " + property + " slated for deletion")
+			}
+		})
+		if (toDelete.length) {
+			toDelete.forEach(function (entity) {
+				var index = entitiesArray.indexOf(entity)
+				entitiesArray.splice(index, 1)
+			})
+			trace(
+				toDelete.length +
+					" entities in entities." +
+					property +
+					" was garbage collected"
+			)
+		}
+	}
+}
 
 function drawStars() {
-	stars.forEach(function (star) {
+	state.entities.stars.forEach(function (star) {
 		spr(star.spriteID, star.x, star.y, star.transparentColorIndex)
 		star.move()
 	})
@@ -82,8 +127,9 @@ function drawStars() {
 
 function drawShip() {
 	var exhaustSpriteID = 32
-	spr(ship.spriteID, ship.x, ship.y, 0, 2)
-	if (frame % 6 === 5) {
+	var ship = state.entities.ships[0]
+	spr(ship.spriteID, ship.x, ship.y, 0, ship.spriteScale)
+	if (state.frame % 6 === 5) {
 		ship.animationFrame = (ship.animationFrame + 1) % 3
 	}
 	spr(exhaustSpriteID + ship.animationFrame, ship.x, ship.y + 16, 0, 2)
@@ -91,19 +137,37 @@ function drawShip() {
 
 function BOOT() {
 	for (var i = 0; i < maxStars; i++) {
-		stars.push(new Star(randInt(screenX), randInt(screenY), randInt(6)))
+		state.entities.stars.push(new Star(randInt(screenX), randInt(screenY)))
 	}
 	// sort the stars by plane so the closer and faster ones draw on top of the others
-	stars.sort(function (a, b) {
+	state.entities.stars.sort(function (a, b) {
 		return a.plane - b.plane
 	})
-	ship = new Ship()
+	state.entities.ships.push(new Ship())
+	// garbace collection test
+	/*state.entities.junk.push(new Star(0, screenY + 10))
+	state.entities.junk.push(new Star(screenX + 10, 0))
+	state.entities.junk.push(new Star(screenX + 10, screenY + 10))
+	state.entities.junk.push(new Star(-9, -9))
+	state.entities.junk.push(new Star(0, -9))
+	state.entities.junk.push(new Star(-9, 1))
+	state.entities.junk.push(new Star(-9, 2))
+	state.entities.junk.push(new Star(-9, -1))
+	state.entities.junk.push(new Star(-9, -2))
+	state.entities.junk.push(new Star(-9, 0)) */
 }
 function TIC() {
 	cls(0)
 	drawStars()
 	drawShip()
-	frame = (frame + 1) % 1028
+	// have framecount loop every 10 minutes
+	state.frame = (state.frame + 1) % (60 * 60 * 10)
+	// run GC once per minute
+	if (state.frame % (60 * 60) === 0) {
+		//trace("Starting Garbage Collection:")
+		entitiesGC()
+		//trace("End Garbage Collection")
+	}
 }
 
 // <TILES>
@@ -143,4 +207,3 @@ function TIC() {
 // <PALETTE>
 // 000:1a1c2c5d275db13e53ef7d57ffcd75a7f07038b76425717929366f3b5dc941a6f673eff7f4f4f494b0c2566c86333c57
 // </PALETTE>
-
