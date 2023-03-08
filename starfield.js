@@ -25,7 +25,7 @@ var state = {
 	frame: 0,
 	frameTimes: [],
 	lastFrameEndTime: 0,
-	totalFrameEndTimes: []
+	totalFrameEndTimes: [],
 }
 
 // Classes (well as close as possible in ES5)
@@ -116,10 +116,10 @@ function Star(config) {
 	Entity.call(this, config)
 	this.className = "Star"
 	// divides the stars into 4 planes which move at different speeds for parallax
-	this.plane = randInt(4)
-	this.speed = 0.2 * ((this.plane + 1) / 2)
+	this.plane = randInt(3)
+	this.speed = [0.2, 0.25, 0.333333333333333, 0.5][this.plane]
+	this.framesPerPixel = [5, 4, 3, 2][this.plane]
 	this.randomize = function (x, spriteID) {
-		//this.speed = Math.random() * 0.3 + 0.2
 		this.spriteFlip = randInt(3)
 		this.spriteRotation = randInt(3)
 		this.x = x !== undefined ? x : randInt(SCREEN_SIZE_X - 8)
@@ -128,12 +128,14 @@ function Star(config) {
 	}
 	this.move = function () {
 		var minY = 0 - this.spriteSize
-		// if the next frame would be offscreen wrap around to the top as a new star
-		if (this.y + this.speed >= SCREEN_SIZE_Y) {
-			this.setY(minY)
-			this.randomize()
-		} else {
-			this.setY(this.y + this.speed)
+		if (state.frame % this.framesPerPixel === 0) {
+			// if the next frame would be offscreen wrap around to the top as a new star
+			if (this.y + 1 >= SCREEN_SIZE_Y) {
+				this.randomize()
+				this.setY(minY)
+			} else {
+				this.setY(this.y + 1)
+			}
 		}
 	}
 	this.destruct = function () {
@@ -217,6 +219,20 @@ function UFO(config) {
 			this.destruct()
 			//trace("UFO self destructed")
 		}
+	}
+	this.draw = function () {
+		var exhaustSpriteID = 64
+		spr(this.spriteID, this.x, this.y, this.transparentColorIndex)
+		if (state.frame % 6 === 5) {
+			this.animationFrame = (this.animationFrame + 1) % 3
+		}
+		// the ship exhaust animation is a different sprite
+		spr(
+			exhaustSpriteID + this.animationFrame,
+			this.x,
+			this.y + this.spriteSize,
+			this.transparentColorIndex
+		)
 	}
 }
 
@@ -352,6 +368,7 @@ function TIC() {
 		state.framesToNextUFO = randInt(1800) + 600
 		//trace("A UFO!")
 	}
+	
 	// run GC once per minute
 	if (state.frame % (60 * 60) === 0) {
 		//trace("Starting Garbage Collection:")
@@ -360,30 +377,37 @@ function TIC() {
 	}
 	//framerate info
 	var frameTime = time() - startTime
-	state.frameTimes.push (frameTime)
+	state.frameTimes.push(frameTime)
 	if (state.frameTimes.length > 10) {
 		state.frameTimes.shift()
 	}
-	avgFrameTime = state.frameTimes.reduce(function (accumulator, value) {
-		return accumulator + value
-	}, 0) / state.frameTimes.length
+	avgFrameTime =
+		state.frameTimes.reduce(function (accumulator, value) {
+			return accumulator + value
+		}, 0) / state.frameTimes.length
 
 	state.totalFrameEndTimes.push(state.lastFrameEndTime)
 	if (state.totalFrameEndTimes.length > 10) {
 		state.totalFrameEndTimes.shift()
 	}
-	avgTotalFrameEndTime = state.totalFrameEndTimes.map(function (element, index, array) {
-		if (index > 0) {
-			return element - array[index - 1]
-		} else {
-			return 0
-		}
-	}).reduce(function (accumulator, value) {
-		return accumulator + value
-	}, 0) / state.totalFrameEndTimes.length
+	avgTotalFrameEndTime =
+		state.totalFrameEndTimes
+			.map(function (element, index, array) {
+				if (index > 0) {
+					return element - array[index - 1]
+				} else {
+					return 0
+				}
+			})
+			.reduce(function (accumulator, value) {
+				return accumulator + value
+			}, 0) / state.totalFrameEndTimes.length
 
-	print((((state.frame - 1) / state.lastFrameEndTime) * 1000).toPrecision(2) + "fps")
-	print("(" + (avgTotalFrameEndTime).toFixed(4) + ") (total)", 40, 0)
+	print(
+		(((state.frame - 1) / state.lastFrameEndTime) * 1000).toPrecision(2) +
+			"fps"
+	)
+	print("(" + avgTotalFrameEndTime.toFixed(4) + ") (total)", 40, 0)
 	print((60, 1000 / avgFrameTime).toFixed(0) + "fps", 0, 8)
 	print("(" + avgFrameTime.toFixed(4) + "/16.6ms) (game loop)", 40, 8)
 	state.lastFrameEndTime = time()
@@ -414,6 +438,9 @@ function TIC() {
 // 033:80000008900aa009a0a99a0a0098890000800800000000000000000000000000
 // 034:000000009000000900a00a00809aa90800899800000880000000000000000000
 // 048:0000000000cdef0006deef6004fffe4046644664677667767bb77bb709900990
+// 064:0baa998000000000000000000000000000000000000000000000000000000000
+// 065:09abba9000000000000000000000000000000000000000000000000000000000
+// 066:0899aab000000000000000000000000000000000000000000000000000000000
 // 255:ccccccccc00ee00cc0e00e0cc0000e0cc000e00cc000000cc000e00ccccccccc
 // </TILES>
 
