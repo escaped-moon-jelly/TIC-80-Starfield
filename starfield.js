@@ -21,7 +21,11 @@ var state = {
 		junk: [],
 	},
 	mainShip: undefined,
+	framesToNextUFO: randInt(1800) + 600,
 	frame: 0,
+	frameTimes: [],
+	lastFrameEndTime: 0,
+	totalFrameEndTimes: []
 }
 
 // Classes (well as close as possible in ES5)
@@ -343,8 +347,9 @@ function TIC() {
 	cls(0)
 	drawAndMoveEntities()
 	//spawn a UFO every now and then
-	if (state.frame % (60 * (randInt(40) + 10)) === 0) {
+	if (state.framesToNextUFO-- <= 0) {
 		spawnUFO()
+		state.framesToNextUFO = randInt(1800) + 600
 		//trace("A UFO!")
 	}
 	// run GC once per minute
@@ -354,8 +359,34 @@ function TIC() {
 		//trace("End Garbage Collection")
 	}
 	//framerate info
-	print(((state.frame / startTime) * 1000).toPrecision(2) + "fps")
-	print("(" + (time() - startTime).toFixed(4) + "/16.6ms)", 32, 0)
+	var frameTime = time() - startTime
+	state.frameTimes.push (frameTime)
+	if (state.frameTimes.length > 10) {
+		state.frameTimes.shift()
+	}
+	avgFrameTime = state.frameTimes.reduce(function (accumulator, value) {
+		return accumulator + value
+	}, 0) / state.frameTimes.length
+
+	state.totalFrameEndTimes.push(state.lastFrameEndTime)
+	if (state.totalFrameEndTimes.length > 10) {
+		state.totalFrameEndTimes.shift()
+	}
+	avgTotalFrameEndTime = state.totalFrameEndTimes.map(function (element, index, array) {
+		if (index > 0) {
+			return element - array[index - 1]
+		} else {
+			return 0
+		}
+	}).reduce(function (accumulator, value) {
+		return accumulator + value
+	}, 0) / state.totalFrameEndTimes.length
+
+	print((((state.frame - 1) / state.lastFrameEndTime) * 1000).toPrecision(2) + "fps")
+	print("(" + (avgTotalFrameEndTime).toFixed(4) + ") (total)", 40, 0)
+	print((60, 1000 / avgFrameTime).toFixed(0) + "fps", 0, 8)
+	print("(" + avgFrameTime.toFixed(4) + "/16.6ms) (game loop)", 40, 8)
+	state.lastFrameEndTime = time()
 }
 /*
 ------------------------------------------------------------------------
