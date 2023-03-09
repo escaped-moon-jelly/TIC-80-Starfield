@@ -5,7 +5,7 @@
 // desc:    A simple scrolling starfield demo
 // site:
 // license: MIT License
-// version: 0.1
+// version: 1.0
 // script:  js
 //'use strict'
 
@@ -43,7 +43,7 @@ var state = {
  * @param {Boolean} [config.gcExempt=false] - allows object to avoid garbage collection if necessary
  */
 function Entity(config) {
-	this.className = "Entity"
+	this.className = 'Entity'
 	this.x = config.x !== undefined ? config.x : 0
 	this.y = config.y !== undefined ? config.y : 0
 	this.spriteID = config.spriteID !== undefined ? config.spriteID : 255
@@ -58,54 +58,82 @@ function Entity(config) {
 	this.spriteScale = config.spriteScale !== undefined ? config.spriteScale : 1
 	this.spriteSize = 8 * this.spriteScale
 	this.gcExempt = config.gcExempt !== undefined ? config.gcExempt : false
-	this.getPosition = function () {
-		return [this.x, this.y]
-	}
-	this.setX = function (newX) {
-		this.x = newX
-	}
-	this.setY = function (newY) {
-		this.y = newY
-	}
-	this.setPos = function (x, y) {
-		this.x = x
-		this.y = y
-	}
-	this.setSprite = function (newSpriteID) {
-		this.SpriteID = newSpriteID
-	}
-	this.getIsOnscreen = function () {
-		var minXY = 0 - this.spriteSize
-		var xOnscreen = minXY <= this.x && this.x <= SCREEN_SIZE_X
-		var yOnscreen = minXY <= this.y && this.y <= SCREEN_SIZE_Y
-		/*if (!xOnscreen || !yOnscreen) {
-			trace("entity not onscreen: " + this.x +"," + this.y)
-		}*/
-		return xOnscreen && yOnscreen
-	}
-	this.draw = function () {
-		if (!fget(this.spriteID, 0)) {
-			spr(
-				this.spriteID,
-				this.x,
-				this.y,
-				this.transparentColorIndex,
-				this.spriteScale,
-				this.spriteFlip,
-				this.spriteRotation
-			)
-		} else {
-			// if the sprite has the noFlip flag set, ignore any rotation or flip config
-			spr(
-				this.spriteID,
-				this.x,
-				this.y,
-				this.transparentColorIndex,
-				this.spriteScale,
-				0,
-				0
-			)
-		}
+}
+/**
+ * 
+ * @returns the position an an array [x,y]
+ */
+Entity.prototype.getPosition = function () {
+	return [this.x, this.y]
+}
+/**
+ * Sets the x position
+ * @param {Number} newX 
+ */
+Entity.prototype.setX = function (newX) {
+	this.x = newX
+}
+/**
+ * Sets the y position
+ * @param {Number} newY 
+ */
+Entity.prototype.setY = function (newY) {
+	this.y = newY
+}
+/**
+ * Sets the x and y positions at once
+ * @param {Number} x 
+ * @param {Number} y 
+ */
+Entity.prototype.setPos = function (x, y) {
+	this.x = x
+	this.y = y
+}
+/**
+ * Sets the spriteID
+ * @param {Number} newSpriteID 
+ */
+Entity.prototype.setSprite = function (newSpriteID) {
+	this.SpriteID = newSpriteID
+}
+/**
+ * 
+ * @returns true if entity's sprite should be on screen (if visible)
+ */
+Entity.prototype.getIsOnscreen = function () {
+	var minXY = 0 - this.spriteSize
+	var xOnscreen = minXY <= this.x && this.x <= SCREEN_SIZE_X
+	var yOnscreen = minXY <= this.y && this.y <= SCREEN_SIZE_Y
+	/*if (!xOnscreen || !yOnscreen) {
+		trace("entity not onscreen: " + this.x +"," + this.y)
+	}*/
+	return xOnscreen && yOnscreen
+}
+/**
+ * Draws the entity's sprite to the screen
+ */
+Entity.prototype.draw = function () {
+	if (!fget(this.spriteID, 0)) {
+		spr(
+			this.spriteID,
+			this.x,
+			this.y,
+			this.transparentColorIndex,
+			this.spriteScale,
+			this.spriteFlip,
+			this.spriteRotation
+		)
+	} else {
+		// if the sprite has the noFlip flag set, ignore any rotation or flip config
+		spr(
+			this.spriteID,
+			this.x,
+			this.y,
+			this.transparentColorIndex,
+			this.spriteScale,
+			0,
+			0
+		)
 	}
 }
 /**
@@ -115,37 +143,50 @@ function Entity(config) {
  */
 function Star(config) {
 	Entity.call(this, config)
-	this.className = "Star"
+	this.className = 'Star'
 	// divides the stars into 4 planes which move at different speeds for parallax
 	this.plane = randInt(3)
 	this.speed = [0.2, 0.25, 0.333333333333333, 0.5][this.plane]
 	this.framesPerPixel = [5, 4, 3, 2][this.plane]
-	this.randomize = function (x, spriteID) {
-		this.spriteFlip = randInt(3)
-		this.spriteRotation = randInt(3)
-		this.x = x !== undefined ? x : randInt(SCREEN_SIZE_X - 8)
-		this.spriteID =
-			spriteID !== undefined ? spriteID : randInt(NUM_STAR_SPRITES)
-	}
-	this.move = function () {
-		var minY = 0 - this.spriteSize
-		if (state.frame % this.framesPerPixel === 0) {
-			// if the next frame would be offscreen wrap around to the top as a new star
-			if (this.y + 1 >= SCREEN_SIZE_Y) {
-				this.randomize()
-				this.setY(minY)
-			} else {
-				this.setY(this.y + 1)
-			}
-		}
-	}
-	this.destruct = function () {
-		var index = state.entities.stars.indexOf(this)
-		state.entities.stars.splice(index, 1)
-	}
 
 	this.randomize(this.x, this.spriteID)
 }
+/**
+ * Randomizes the x position and appearance of the star
+ * will respect initial spriteID and x values on init, but will randomly flip and rotate
+ * @param {Number} x 
+ * @param {Number} spriteID 
+ */
+Star.prototype.randomize = function (x, spriteID) {
+	this.spriteFlip = randInt(3)
+	this.spriteRotation = randInt(3)
+	this.x = x !== undefined ? x : randInt(SCREEN_SIZE_X - 8)
+	this.spriteID =
+		spriteID !== undefined ? spriteID : randInt(NUM_STAR_SPRITES)
+}
+/**
+ * moves the star down the screen alongside every other star in it's plane
+ */
+Star.prototype.move = function () {
+	var minY = 0 - this.spriteSize
+	if (state.frame % this.framesPerPixel === 0) {
+		// if the next frame would be offscreen wrap around to the top as a new star
+		if (this.y + 1 >= SCREEN_SIZE_Y) {
+			this.randomize()
+			this.setY(minY)
+		} else {
+			this.setY(this.y + 1)
+		}
+	}
+}
+/**
+ * Finds and removes the star from the list of entities
+ */
+Star.prototype.destruct = function () {
+	var index = state.entities.stars.indexOf(this)
+	state.entities.stars.splice(index, 1)
+}
+Object.setPrototypeOf(Star.prototype, Entity.prototype)
 /**
  * Represents any ship entity.
  * @constructor
@@ -153,13 +194,17 @@ function Star(config) {
  */
 function Ship(config) {
 	Entity.call(this, config)
-	this.className = "Ship"
+	this.className = 'Ship'
 	this.animationFrame = 0
-	this.destruct = function () {
-		var index = state.entities.ships.indexOf(this)
-		state.entities.ships.splice(index, 1)
-	}
 }
+/**
+ * Finds and removes the ship from the list of entities
+ */
+Ship.prototype.destruct = function () {
+	var index = state.entities.ships.indexOf(this)
+	state.entities.ships.splice(index, 1)
+}
+Object.setPrototypeOf(Ship.prototype, Entity.prototype)
 /**
  * Represents the main ship in the lower middle of the screen.
  * @constructor
@@ -167,26 +212,33 @@ function Ship(config) {
  */
 function MainShip(config) {
 	Ship.call(this, config)
-	this.className = "MainShip"
-	this.move = function () {
-		this.y += Math.sin(state.frame / 8) / 4
-	}
-	this.draw = function () {
-		var exhaustSpriteID = 32
-		spr(this.spriteID, this.x, this.y, this.transparentColorIndex, 2)
-		if (state.frame % 6 === 5) {
-			this.animationFrame = (this.animationFrame + 1) % 3
-		}
-		// the ship exhaust animation is a different sprite
-		spr(
-			exhaustSpriteID + this.animationFrame,
-			this.x,
-			this.y + 16,
-			this.transparentColorIndex,
-			2
-		)
-	}
+	this.className = 'MainShip'
 }
+/**
+ * Bobs the main ship up and down
+ */
+MainShip.prototype.move = function () {
+	this.y += Math.sin(state.frame / 8) / 4
+}
+/**
+ * Draws the main ship to the screen with a little exhaust effect
+ */
+MainShip.prototype.draw = function () {
+	var exhaustSpriteID = 32
+	spr(this.spriteID, this.x, this.y, this.transparentColorIndex, 2)
+	if (state.frame % 6 === 5) {
+		this.animationFrame = (this.animationFrame + 1) % 3
+	}
+	// the ship exhaust animation is a different sprite
+	spr(
+		exhaustSpriteID + this.animationFrame,
+		this.x,
+		this.y + 16,
+		this.transparentColorIndex,
+		2
+	)
+}
+Object.setPrototypeOf(MainShip.prototype, Ship.prototype)
 /**
  * Represents the UFO ships that fly past.
  * @constructor
@@ -197,7 +249,7 @@ function MainShip(config) {
  */
 function UFO(config) {
 	Ship.call(this, config)
-	this.className = "UFO"
+	this.className = 'UFO'
 	this.speed = config.speed
 	this.vertical = config.vertical ? config.vertical : false
 	if (config.direction === -1) {
@@ -207,37 +259,44 @@ function UFO(config) {
 		this.direction = 1
 		//this.x = 1 - this.spriteSize
 	}
-	this.move = function () {
-		if (this.vertical) {
-			this.y += this.speed * this.direction
-			this.x += Math.sin(state.frame / 8) / 4
-		} else {
-			this.x += this.speed * this.direction
-			this.y += this.speed / 6
-			this.y += Math.sin(state.frame / 8) / 4
-		}
-		sfx(01, "G-3", -1, 0, 8, 8)
-		if (!this.getIsOnscreen()) {
-			sfx(-1, -1, -1, 0)
-			this.destruct()
-			//trace("UFO self destructed")
-		}
+}
+/**
+ * Updates the position of the UFO and plays a sfx
+ */
+UFO.prototype.move = function () {
+	if (this.vertical) {
+		this.y += this.speed * this.direction
+		this.x += Math.sin(state.frame / 8) / 4
+	} else {
+		this.x += this.speed * this.direction
+		this.y += this.speed / 6
+		this.y += Math.sin(state.frame / 8) / 4
 	}
-	this.draw = function () {
-		var exhaustSpriteID = 64
-		spr(this.spriteID, this.x, this.y, this.transparentColorIndex)
-		if (state.frame % 6 === 5) {
-			this.animationFrame = (this.animationFrame + 1) % 3
-		}
-		// the ship exhaust animation is a different sprite
-		spr(
-			exhaustSpriteID + this.animationFrame,
-			this.x,
-			this.y + this.spriteSize,
-			this.transparentColorIndex
-		)
+	sfx(01, 'G-3', -1, 0, 8, 8)
+	if (!this.getIsOnscreen()) {
+		sfx(-1, -1, -1, 0)
+		this.destruct()
+		//trace("UFO self destructed")
 	}
 }
+/**
+ *  Draws the UFO to the screen
+ */
+UFO.prototype.draw = function () {
+	var exhaustSpriteID = 64
+	spr(this.spriteID, this.x, this.y, this.transparentColorIndex)
+	if (state.frame % 6 === 5) {
+		this.animationFrame = (this.animationFrame + 1) % 3
+	}
+	// the ship exhaust animation is a different sprite
+	spr(
+		exhaustSpriteID + this.animationFrame,
+		this.x,
+		this.y + this.spriteSize,
+		this.transparentColorIndex
+	)
+}
+Object.setPrototypeOf(UFO.prototype, Ship.prototype)
 
 // Functions
 /**
@@ -257,7 +316,7 @@ function entitiesGC() {
 		entitiesArray.forEach(function (entity) {
 			if (!entity.gcExempt && !entity.getIsOnscreen()) {
 				toDelete.push(entity)
-				trace("Entity in " + property + " slated for deletion")
+				trace('Entity in ' + property + ' slated for deletion')
 			}
 		})
 		if (toDelete.length) {
@@ -267,9 +326,9 @@ function entitiesGC() {
 			})
 			trace(
 				toDelete.length +
-					" entities in entities." +
+					' entities in entities.' +
 					property +
-					" was garbage collected"
+					' was garbage collected'
 			)
 		}
 	}
@@ -418,11 +477,11 @@ function TIC() {
 
 	print(
 		(((state.frame - 1) / state.lastFrameEndTime) * 1000).toPrecision(2) +
-			"fps"
+			'fps'
 	)
-	print("(" + avgTotalFrameEndTime.toFixed(4) + ") (total)", 40, 0)
-	print((60, 1000 / avgFrameTime).toFixed(0) + "fps", 0, 8)
-	print("(" + avgFrameTime.toFixed(4) + "/16.6ms) (game loop)", 40, 8)
+	print('(' + avgTotalFrameEndTime.toFixed(4) + ') (total)', 40, 0)
+	print((60, 1000 / avgFrameTime).toFixed(0) + 'fps', 0, 8)
+	print('(' + avgFrameTime.toFixed(4) + '/16.6ms) (game loop)', 40, 8)
 	state.lastFrameEndTime = time()
 }
 /*
@@ -502,4 +561,3 @@ function TIC() {
 // <PALETTE>
 // 000:1a1c2c5d275db13e53ef7d57ffcd75a7f07038b76425717929366f3b5dc941a6f673eff7f4f4f494b0c2566c86333c57
 // </PALETTE>
-
